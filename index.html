@@ -84,7 +84,7 @@ header.hero p { margin:2px 0 0; color:var(--muted); font-size:13px; }
       <div class="sbox"><input id="q" type="search" placeholder="가수 또는 곡명 검색" autocomplete="off"><button type="button" id="q-x" aria-label="지우기">✕</button></div>
     </div>
     <div class="fs" id="fs"></div>
-    <div class="nav" id="nav"></div>
+    <div class="fs" id="fs2"></div>
   </div>
 
   <div class="meta"><span id="count"></span><span class="legend" id="legend"></span></div>
@@ -104,7 +104,7 @@ const grp = t => { const c = clean(t).charCodeAt(0); if (c >= 0xAC00 && c <= 0xD
 const cmp = (a, b) => a.localeCompare(b, 'ko');
 const MARK = ['', '◈', '◆', '▲', '■', '●', '✦'];
 const CATS = (D.cfg.cats || []);
-const state = { mode: 'singer', q: '', f: 'all' };
+const state = { mode: 'singer', q: '', f: 'all', tags: new Set(), rec: false };
 
 /* ── 머리말 ── */
 (function head() {
@@ -127,59 +127,62 @@ let tt = 0;
 function toast(m, ms) { const t = $('toast'); t.textContent = m; t.classList.add('on'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('on'), ms || 1600); }
 
 /* ── 카테고리 필터·범례 (시트에 있는 카테고리로 자동 생성) ── */
-$('fs').innerHTML = '<button type="button" class="on" data-f="all">전체</button>' +
-  CATS.map((c, i) => `<button type="button" data-f="${i + 1}">${MARK[i + 1]} ${esc(c)}</button>`).join('') +
-  '<button type="button" data-f="rec">★ 강추</button>';
-$('legend').innerHTML = CATS.map((c, i) => `<span class="k${i + 1}">${MARK[i + 1]} ${esc(c)}</span>`).join('') + '<span class="c">★ 강추</span>';
+const SUBS = D.cfg.subTags || [];
+$('fs').innerHTML = '<button type="button" class="on" data-f="all">전체</button>' + CATS.map((c, i) => `<button type="button" data-f="${i + 1}">${esc(c)}</button>`).join('');
+$('fs2').innerHTML = SUBS.map((n, i) => `<button type="button" data-t="${i}">${esc(n)}</button>`).join('') + '<button type="button" data-t="rec">★ 강추</button>';
+$('legend').innerHTML = '<span class="c">★ 강추</span>';
+const NOCAT = '미분류';
+const GN = CATS.concat([NOCAT]);   // 장르 목록 (맨 끝은 분류가 비어 있는 곡)
 
 /* ── 목록 ── */
-const L = D.songs.map(r => ({ s: r[0], t: r[1], m: r[2], k: r[3], n: r[4] }));
+const L = D.songs.map(r => ({ s: r[0], t: r[1], m: r[2], k: r[3], n: r[4], u: r[5] || '', g: r[6] || [] }));
 function view() {
   const q = state.q.trim().toLowerCase(), key = state.mode === 'singer' ? 's' : 't', oth = state.mode === 'singer' ? 't' : 's';
-  const rows = L.filter(x => (state.f === 'all' || (state.f === 'rec' ? x.k : x.m === +state.f)) && (!q || (x.s + ' ' + x.t).toLowerCase().includes(q)));
-  const by = new Map(G.map(g => [g, []]));
-  rows.forEach(x => by.get(grp(x[key])).push(x));
+  const rows = L.filter(x => (state.f === 'all' || x.m === +state.f) && (!state.rec || x.k) && [...state.tags].every(i => x.g.includes(i)) && (!q || (x.s + ' ' + x.t).toLowerCase().includes(q)));
+  const by = new Map(GN.map(g => [g, []]));
+  rows.forEach(x => by.get(x.m > 0 ? CATS[x.m - 1] : NOCAT).push(x));
   by.forEach(a => a.sort((p, q2) => cmp(clean(p[key]), clean(q2[key])) || cmp(p[oth], q2[oth])));
   return { by, n: rows.length };
 }
 function render() {
   const { by, n } = view();
-  const searching = state.q.trim() || state.f !== 'all';
+  const searching = state.q.trim() || state.f !== 'all' || state.rec || state.tags.size;
   const key = state.mode === 'singer' ? 's' : 't', oth = state.mode === 'singer' ? 't' : 's';
   $('count').textContent = searching ? `${n}곡 찾았어요` : `전체 ${L.length}곡`;
-  $('nav').innerHTML = G.filter(g => g !== '기타' || by.get(g).length)
-    .map(g => `<button type="button" class="ln" data-g="${g}" ${by.get(g).length ? '' : 'disabled'}>${g}</button>`).join('');
   const out = [];
-  G.forEach(g => {
+  GN.forEach((g, gi) => {
     const a = by.get(g);
-    if (!a.length && (searching || g === '기타')) return;
-    out.push(`<section class="grp" id="g-${G.indexOf(g)}"><h2><span>${g}</span><em>${a.length}</em></h2>` +
-      (a.length ? `<ul>${a.map(x => {
-        const st = (x.k ? '<u title="강추">★</u>' : '') + (x.n ? '<em class="new">NEW</em>' : '');
-        const name = state.mode === 'singer' ? `<b>${esc(x.s)}</b><span>${esc(x.t)}${st}</span>` : `<b>${esc(x.t)}${st}</b><span>${esc(x.s)}</span>`;
-        return `<li class="m${x.m}"><i>${MARK[x.m] || ''}</i><p>${name}</p><button type="button" class="cp" data-i="${L.indexOf(x)}" aria-label="복사">복사</button></li>`;
-      }).join('')}</ul>` : '<div class="none">없음</div>') + '</section>');
+    if (!a.length) return;
+    out.push(`<section class="grp" id="g-${gi}"><h2><span>${esc(g)}</span><em>${a.length}</em></h2><ul>${a.map(x => {
+      const st = (x.k ? '<u title="강추">★</u>' : '') + (x.n ? '<em class="new">NEW</em>' : '');
+      const name = state.mode === 'singer' ? `<b>${esc(x.s)}</b><span>${esc(x.t)}${st}</span>` : `<b>${esc(x.t)}${st}</b><span>${esc(x.s)}</span>`;
+      return `<li><p>${name}</p><button type="button" class="cp" data-i="${L.indexOf(x)}" aria-label="복사">복사</button></li>`;
+    }).join('')}</ul></section>`);
   });
   $('list').innerHTML = out.join('') || '<div class="empty">찾는 곡이 없어요.<br><small>다른 글자로 검색하거나 필터를 「전체」로 바꿔보세요.</small></div>';
 }
 function go(g) {
-  const el = $('g-' + G.indexOf(g)); if (!el) return;
+  const el = $('g-' + g); if (!el) return;
   const off = $('bar').offsetHeight + 8;
   window.scrollTo({ top: el.getBoundingClientRect().top + scrollY - off, behavior: 'smooth' });
 }
 $('list').addEventListener('click', async e => {
   const b = e.target.closest('.cp'); if (!b) return;
   const x = L[+b.dataset.i]; if (!x) return;
-  const txt = x.s + ' ' + x.t;
+  const txt = x.u || (x.s + ' ' + x.t);
   try { await navigator.clipboard.writeText(txt); }
   catch (err) { const t = document.createElement('textarea'); t.value = txt; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } catch (e2) {} t.remove(); }
   document.querySelectorAll('.cp.done').forEach(n => { n.classList.remove('done'); n.textContent = '복사'; });
   b.classList.add('done'); b.textContent = '복사됨';
-  toast('복사되었습니다! 채팅창에 붙여넣기 하세요!(채팅입력창에 커서가 깜빡일 때 해당 부분을 꾹 누르면 붙여넣기 메뉴가 뜹니다)', 5000);
+  toast(x.u ? '유튜브 주소를 복사했어요! 채팅창에 붙여넣기 하세요!(채팅입력창에 커서가 깜빡일 때 해당 부분을 꾹 누르면 붙여넣기 메뉴가 뜹니다)' : '이 곡은 영상 주소가 없어서 「가수 곡명」을 복사했어요.', 5000);
 });
-$('nav').addEventListener('click', e => { const b = e.target.closest('.ln'); if (b && !b.disabled) go(b.dataset.g); });
 $('modes').addEventListener('click', e => { const b = e.target.closest('[data-mode]'); if (!b) return; state.mode = b.dataset.mode; document.querySelectorAll('#modes button').forEach(x => x.classList.toggle('on', x === b)); render(); });
 $('fs').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; state.f = b.dataset.f; document.querySelectorAll('#fs button').forEach(x => x.classList.toggle('on', x === b)); render(); });
+$('fs2').addEventListener('click', e => {
+  const b = e.target.closest('[data-t]'); if (!b) return;
+  if (b.dataset.t === 'rec') state.rec = !state.rec; else { const i = +b.dataset.t; state.tags.has(i) ? state.tags.delete(i) : state.tags.add(i); }
+  b.classList.toggle('on'); render();
+});
 $('q').addEventListener('input', e => { state.q = e.target.value; render(); });
 $('q-x').addEventListener('click', () => { $('q').value = ''; state.q = ''; render(); $('q').focus(); });
 $('top').addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
