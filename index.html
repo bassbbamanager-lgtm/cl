@@ -34,6 +34,7 @@ header.hero p { margin:2px 0 0; color:var(--muted); font-size:13px; }
 .sbox input:focus { outline:2px solid var(--accent); outline-offset:-1px; }
 .sbox button { position:absolute; right:6px; top:5px; width:24px; height:24px; border:0; border-radius:50%; background:transparent; color:var(--muted); }
 .fs { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+.fg { display:contents; }
 .fs button { border:1px solid var(--line); background:var(--surface); border-radius:999px; padding:3px 11px; font-size:12px; font-weight:600; color:var(--muted); }
 .fs button.on { background:var(--fg); color:var(--bg); border-color:var(--fg); }
 .nav { display:flex; gap:5px; overflow-x:auto; padding:7px 0 2px; scrollbar-width:none; }
@@ -80,11 +81,10 @@ header.hero p { margin:2px 0 0; color:var(--muted); font-size:13px; }
 
   <div id="bar">
     <div class="row">
-      <div class="seg" id="modes"><button type="button" class="on" data-mode="singer">가수명순</button><button type="button" data-mode="title">곡명순</button></div>
+      <div class="seg" id="modes"><button type="button" data-mode="singer">가수명순</button><button type="button" class="on" data-mode="title">곡명순</button></div>
       <div class="sbox"><input id="q" type="search" placeholder="가수 또는 곡명 검색" autocomplete="off"><button type="button" id="q-x" aria-label="지우기">✕</button></div>
     </div>
-    <div class="fs" id="fs"></div>
-    <div class="fs" id="fs2"></div>
+    <div class="fs" id="fsall"><span class="fg" id="fs"></span><span class="fg" id="fs2"></span></div>
   </div>
 
   <div class="meta"><span id="count"></span><span class="legend" id="legend"></span></div>
@@ -104,7 +104,7 @@ const grp = t => { const c = clean(t).charCodeAt(0); if (c >= 0xAC00 && c <= 0xD
 const cmp = (a, b) => a.localeCompare(b, 'ko');
 const MARK = ['', '◈', '◆', '▲', '■', '●', '✦'];
 const CATS = (D.cfg.cats || []);
-const state = { mode: 'singer', q: '', f: 'all', tags: new Set(), rec: false };
+const state = { mode: 'title', q: '', f: 'all', tags: new Set(), rec: false };
 
 /* ── 머리말 ── */
 (function head() {
@@ -130,7 +130,7 @@ function toast(m, ms) { const t = $('toast'); t.textContent = m; t.classList.add
 const SUBS = D.cfg.subTags || [];
 $('fs').innerHTML = '<button type="button" class="on" data-f="all">전체</button>' + CATS.map((c, i) => `<button type="button" data-f="${i + 1}">${esc(c)}</button>`).join('');
 $('fs2').innerHTML = SUBS.map((n, i) => `<button type="button" data-t="${i}">${esc(n)}</button>`).join('') + '<button type="button" data-t="rec">★ 강추</button>';
-$('legend').innerHTML = '<span class="c">★ 강추</span>';
+$('legend').innerHTML = '';
 const NOCAT = '미분류';
 const GN = CATS.concat([NOCAT]);   // 장르 목록 (맨 끝은 분류가 비어 있는 곡)
 
