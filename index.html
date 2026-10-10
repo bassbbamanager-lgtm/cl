@@ -104,7 +104,7 @@ const grp = t => { const c = clean(t).charCodeAt(0); if (c >= 0xAC00 && c <= 0xD
 const cmp = (a, b) => a.localeCompare(b, 'ko');
 const MARK = ['', '◈', '◆', '▲', '■', '●', '✦'];
 const CATS = (D.cfg.cats || []);
-const state = { mode: 'title', q: '', f: 'all', tags: new Set(), rec: false };
+const state = { mode: 'title', q: '', f: 'all', tags: new Set(), rec: false, nw: false };
 
 /* ── 머리말 ── */
 (function head() {
@@ -129,7 +129,7 @@ function toast(m, ms) { const t = $('toast'); t.textContent = m; t.classList.add
 /* ── 카테고리 필터·범례 (시트에 있는 카테고리로 자동 생성) ── */
 const SUBS = D.cfg.subTags || [];
 $('fs').innerHTML = '<button type="button" class="on" data-f="all">전체</button>' + CATS.map((c, i) => `<button type="button" data-f="${i + 1}">${esc(c)}</button>`).join('');
-$('fs2').innerHTML = SUBS.map((n, i) => `<button type="button" data-t="${i}">${esc(n)}</button>`).join('') + '<button type="button" data-t="rec">★ 강추</button>';
+$('fs2').innerHTML = SUBS.map((n, i) => `<button type="button" data-t="${i}">${esc(n)}</button>`).join('') + '<button type="button" data-t="new">신곡 NEW!</button><button type="button" data-t="rec">★ 강추</button>';
 $('legend').innerHTML = '';
 const NOCAT = '미분류';
 const GN = CATS.concat([NOCAT]);   // 장르 목록 (맨 끝은 분류가 비어 있는 곡)
@@ -138,7 +138,7 @@ const GN = CATS.concat([NOCAT]);   // 장르 목록 (맨 끝은 분류가 비어
 const L = D.songs.map(r => ({ s: r[0], t: r[1], m: r[2], k: r[3], n: r[4], u: r[5] || '', g: r[6] || [] }));
 function view() {
   const q = state.q.trim().toLowerCase(), key = state.mode === 'singer' ? 's' : 't', oth = state.mode === 'singer' ? 't' : 's';
-  const rows = L.filter(x => (state.f === 'all' || x.m === +state.f) && (!state.rec || x.k) && [...state.tags].every(i => x.g.includes(i)) && (!q || (x.s + ' ' + x.t).toLowerCase().includes(q)));
+  const rows = L.filter(x => (state.f === 'all' || x.m === +state.f) && (!state.rec || x.k) && (!state.nw || x.n) && [...state.tags].every(i => x.g.includes(i)) && (!q || (x.s + ' ' + x.t).toLowerCase().includes(q)));
   const by = new Map(GN.map(g => [g, []]));
   rows.forEach(x => by.get(x.m > 0 ? CATS[x.m - 1] : NOCAT).push(x));
   by.forEach(a => a.sort((p, q2) => cmp(clean(p[key]), clean(q2[key])) || cmp(p[oth], q2[oth])));
@@ -146,7 +146,7 @@ function view() {
 }
 function render() {
   const { by, n } = view();
-  const searching = state.q.trim() || state.f !== 'all' || state.rec || state.tags.size;
+  const searching = state.q.trim() || state.f !== 'all' || state.rec || state.nw || state.tags.size;
   const key = state.mode === 'singer' ? 's' : 't', oth = state.mode === 'singer' ? 't' : 's';
   $('count').textContent = searching ? `${n}곡 찾았어요` : `전체 ${L.length}곡`;
   const out = [];
@@ -180,7 +180,7 @@ $('modes').addEventListener('click', e => { const b = e.target.closest('[data-mo
 $('fs').addEventListener('click', e => { const b = e.target.closest('[data-f]'); if (!b) return; state.f = b.dataset.f; document.querySelectorAll('#fs button').forEach(x => x.classList.toggle('on', x === b)); render(); });
 $('fs2').addEventListener('click', e => {
   const b = e.target.closest('[data-t]'); if (!b) return;
-  if (b.dataset.t === 'rec') state.rec = !state.rec; else { const i = +b.dataset.t; state.tags.has(i) ? state.tags.delete(i) : state.tags.add(i); }
+  if (b.dataset.t === 'rec') state.rec = !state.rec; else if (b.dataset.t === 'new') state.nw = !state.nw; else { const i = +b.dataset.t; state.tags.has(i) ? state.tags.delete(i) : state.tags.add(i); }
   b.classList.toggle('on'); render();
 });
 $('q').addEventListener('input', e => { state.q = e.target.value; render(); });
